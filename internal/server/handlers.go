@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/a2sh3r/gophkeeper/internal/auth"
+	"github.com/a2sh3r/gophkeeper/internal/crypto"
 	"github.com/a2sh3r/gophkeeper/internal/logger"
 	"github.com/a2sh3r/gophkeeper/internal/models"
 	"github.com/a2sh3r/gophkeeper/internal/storage"
@@ -17,13 +19,13 @@ import (
 
 // UserReader defines read operations for users
 type UserReader interface {
-	GetUserByUsername(username string) (*models.User, error)
-	GetUserByID(userID uuid.UUID) (*models.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error)
 }
 
 // UserWriter defines write operations for users
 type UserWriter interface {
-	CreateUser(user *models.User) error
+	CreateUser(ctx context.Context, user *models.User) error
 }
 
 // UserStorage combines user read and write operations
@@ -34,15 +36,15 @@ type UserStorage interface {
 
 // DataReader defines read operations for data
 type DataReader interface {
-	GetDataByID(dataID uuid.UUID) (*models.Data, error)
-	GetDataByUserID(userID uuid.UUID) ([]*models.Data, error)
+	GetDataByID(ctx context.Context, dataID uuid.UUID) (*models.Data, error)
+	GetDataByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Data, error)
 }
 
 // DataWriter defines write operations for data
 type DataWriter interface {
-	CreateData(data *models.Data) error
-	UpdateData(data *models.Data) error
-	DeleteData(dataID uuid.UUID) error
+	CreateData(ctx context.Context, data *models.Data) error
+	UpdateData(ctx context.Context, data *models.Data) error
+	DeleteData(ctx context.Context, dataID uuid.UUID) error
 }
 
 // DataStorage combines data read and write operations
@@ -101,6 +103,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("User registration attempt", zap.String("username", req.Username))
 
+	// Hash login password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Log.Error("Failed to hash password", zap.Error(err))
@@ -108,15 +111,33 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &models.User{
-		ID:        uuid.New(),
-		Username:  req.Username,
-		Password:  string(hashedPassword),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	// Create crypto manager for master password
+	cryptoManager, err := crypto.NewCryptoManager(req.MasterPassword)
+	if err != nil {
+		logger.Log.Error("Failed to create crypto manager", zap.Error(err))
+		http.Error(w, "Failed to initialize encryption", http.StatusInternalServerError)
+		return
 	}
 
-	if err := s.storage.CreateUser(user); err != nil {
+	// Hash master password
+	hashedMasterPassword, err := bcrypt.GenerateFromPassword([]byte(req.MasterPassword), bcrypt.DefaultCost)
+	if err != nil {
+		logger.Log.Error("Failed to hash master password", zap.Error(err))
+		http.Error(w, "Failed to hash master password", http.StatusInternalServerError)
+		return
+	}
+
+	user := &models.User{
+		ID:             uuid.New(),
+		Username:       req.Username,
+		Password:       string(hashedPassword),
+		MasterPassword: string(hashedMasterPassword),
+		Salt:           cryptoManager.GetSaltBase64(),
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	if err := s.storage.CreateUser(r.Context(), user); err != nil {
 		if err == storage.ErrUserExists {
 			logger.Log.Warn("User already exists", zap.String("username", req.Username))
 			http.Error(w, "User already exists", http.StatusConflict)
@@ -138,6 +159,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	response := models.AuthResponse{
 		Token: token,
 		User:  *user,
+		Salt:  user.Salt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -157,7 +179,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("User login attempt", zap.String("username", req.Username))
 
-	user, err := s.storage.GetUserByUsername(req.Username)
+	user, err := s.storage.GetUserByUsername(r.Context(), req.Username)
 	if err != nil {
 		if err == storage.ErrUserNotFound {
 			logger.Log.Warn("Login failed - user not found", zap.String("username", req.Username))
@@ -186,6 +208,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	response := models.AuthResponse{
 		Token: token,
 		User:  *user,
+		Salt:  user.Salt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -202,7 +225,7 @@ func (s *Server) handleGetData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := s.storage.GetDataByUserID(userID)
+	data, err := s.storage.GetDataByUserID(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Failed to get data", http.StatusInternalServerError)
 		return
@@ -245,7 +268,7 @@ func (s *Server) handleCreateData(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   time.Now(),
 	}
 
-	if err := s.storage.CreateData(data); err != nil {
+	if err := s.storage.CreateData(r.Context(), data); err != nil {
 		http.Error(w, "Failed to create data", http.StatusInternalServerError)
 		return
 	}
@@ -273,7 +296,7 @@ func (s *Server) handleGetDataByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := s.storage.GetDataByID(dataID)
+	data, err := s.storage.GetDataByID(r.Context(), dataID)
 	if err != nil {
 		if err == storage.ErrDataNotFound {
 			http.Error(w, "Data not found", http.StatusNotFound)
@@ -316,7 +339,7 @@ func (s *Server) handleUpdateData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := s.storage.GetDataByID(dataID)
+	data, err := s.storage.GetDataByID(r.Context(), dataID)
 	if err != nil {
 		if err == storage.ErrDataNotFound {
 			http.Error(w, "Data not found", http.StatusNotFound)
@@ -338,7 +361,7 @@ func (s *Server) handleUpdateData(w http.ResponseWriter, r *http.Request) {
 	data.Metadata = req.Metadata
 	data.UpdatedAt = time.Now()
 
-	if err := s.storage.UpdateData(data); err != nil {
+	if err := s.storage.UpdateData(r.Context(), data); err != nil {
 		http.Error(w, "Failed to update data", http.StatusInternalServerError)
 		return
 	}
@@ -365,7 +388,7 @@ func (s *Server) handleDeleteData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := s.storage.GetDataByID(dataID)
+	data, err := s.storage.GetDataByID(r.Context(), dataID)
 	if err != nil {
 		if err == storage.ErrDataNotFound {
 			http.Error(w, "Data not found", http.StatusNotFound)
@@ -380,7 +403,7 @@ func (s *Server) handleDeleteData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.storage.DeleteData(dataID); err != nil {
+	if err := s.storage.DeleteData(r.Context(), dataID); err != nil {
 		http.Error(w, "Failed to delete data", http.StatusInternalServerError)
 		return
 	}

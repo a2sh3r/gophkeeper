@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -102,7 +103,7 @@ func TestClient_Register(t *testing.T) {
 			defer server.Close()
 
 			client := NewClient(server.URL)
-			resp, err := client.Register(tt.username, tt.password)
+			resp, err := client.Register(context.Background(), tt.username, tt.password, "masterPassword123!")
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Register() error = %v, wantErr %v", err, tt.wantErr)
@@ -179,7 +180,7 @@ func TestClient_Login(t *testing.T) {
 			defer server.Close()
 
 			client := NewClient(server.URL)
-			resp, err := client.Login(tt.username, tt.password)
+			resp, err := client.Login(context.Background(), tt.username, tt.password)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Login() error = %v, wantErr %v", err, tt.wantErr)
@@ -253,7 +254,7 @@ func TestClient_GetData(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			data, err := client.GetData()
+			data, err := client.GetData(context.Background())
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetData() error = %v, wantErr %v", err, tt.wantErr)
@@ -341,7 +342,7 @@ func TestClient_CreateData(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			data, err := client.CreateData(tt.dataReq)
+			data, err := client.CreateData(context.Background(), tt.dataReq)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateData() error = %v, wantErr %v", err, tt.wantErr)
@@ -422,7 +423,7 @@ func TestClient_GetDataByID(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			data, err := client.GetDataByID(tt.dataID)
+			data, err := client.GetDataByID(context.Background(), tt.dataID)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetDataByID() error = %v, wantErr %v", err, tt.wantErr)
@@ -514,7 +515,7 @@ func TestClient_UpdateData(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			data, err := client.UpdateData(tt.dataID, tt.dataReq)
+			data, err := client.UpdateData(context.Background(), tt.dataID, tt.dataReq)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateData() error = %v, wantErr %v", err, tt.wantErr)
@@ -599,7 +600,7 @@ func TestClient_DeleteData(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			err := client.DeleteData(tt.dataID)
+			err := client.DeleteData(context.Background(), tt.dataID)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteData() error = %v, wantErr %v", err, tt.wantErr)
@@ -647,7 +648,7 @@ func TestClient_authRequest_ServerError(t *testing.T) {
 			defer server.Close()
 
 			client := NewClient(server.URL)
-			_, err := client.authRequest(tt.endpoint, tt.req)
+			_, err := client.authRequest(context.Background(), tt.endpoint, tt.req)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("authRequest() error = %v, wantErr %v", err, tt.wantErr)
@@ -733,7 +734,7 @@ func TestClient_authRequest_Additional(t *testing.T) {
 
 			client := NewClient(server.URL)
 
-			_, err := client.authRequest(tt.endpoint, tt.req)
+			_, err := client.authRequest(context.Background(), tt.endpoint, tt.req)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("authRequest() error = %v, wantErr %v", err, tt.wantErr)
@@ -832,7 +833,7 @@ func TestClient_GetData_Additional(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			_, err := client.GetData()
+			_, err := client.GetData(context.Background())
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetData() error = %v, wantErr %v", err, tt.wantErr)
@@ -1002,7 +1003,7 @@ func TestClient_CreateData_Additional(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			_, err := client.CreateData(tt.dataReq)
+			_, err := client.CreateData(context.Background(), tt.dataReq)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateData() error = %v, wantErr %v", err, tt.wantErr)
@@ -1120,7 +1121,7 @@ func TestClient_GetData_EdgeCases(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			_, err := client.GetData()
+			_, err := client.GetData(context.Background())
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetData() error = %v, wantErr %v", err, tt.wantErr)
@@ -1442,7 +1443,7 @@ func TestClient_CreateData_EdgeCases(t *testing.T) {
 			client := NewClient(server.URL)
 			client.SetToken(tt.token)
 
-			_, err := client.CreateData(tt.dataReq)
+			_, err := client.CreateData(context.Background(), tt.dataReq)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateData() error = %v, wantErr %v", err, tt.wantErr)

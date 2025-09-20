@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -61,15 +63,17 @@ func TestPostgresStorage_CreateUser(t *testing.T) {
 		{
 			name: "successful user creation",
 			user: &models.User{
-				ID:        uuid.New(),
-				Username:  "testuser",
-				Password:  "hashedpassword",
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:             uuid.New(),
+				Username:       "testuser",
+				Password:       "hashedpassword",
+				MasterPassword: "hashedmasterpassword",
+				Salt:           "salt123",
+				CreatedAt:      time.Now(),
+				UpdatedAt:      time.Now(),
 			},
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("INSERT INTO users").
-					WithArgs(sqlmock.AnyArg(), "testuser", "hashedpassword", sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(sqlmock.AnyArg(), "testuser", "hashedpassword", "hashedmasterpassword", "salt123", sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			wantError: false,
@@ -77,31 +81,35 @@ func TestPostgresStorage_CreateUser(t *testing.T) {
 		{
 			name: "duplicate user error",
 			user: &models.User{
-				ID:        uuid.New(),
-				Username:  "existinguser",
-				Password:  "hashedpassword",
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:             uuid.New(),
+				Username:       "existinguser",
+				Password:       "hashedpassword",
+				MasterPassword: "hashedmasterpassword",
+				Salt:           "salt123",
+				CreatedAt:      time.Now(),
+				UpdatedAt:      time.Now(),
 			},
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("INSERT INTO users").
-					WithArgs(sqlmock.AnyArg(), "existinguser", "hashedpassword", sqlmock.AnyArg(), sqlmock.AnyArg()).
-					WillReturnError(sql.ErrNoRows)
+					WithArgs(sqlmock.AnyArg(), "existinguser", "hashedpassword", "hashedmasterpassword", "salt123", sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WillReturnError(fmt.Errorf(`duplicate key value violates unique constraint "users_username_key"`))
 			},
 			wantError: true,
 		},
 		{
 			name: "database error",
 			user: &models.User{
-				ID:        uuid.New(),
-				Username:  "testuser",
-				Password:  "hashedpassword",
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:             uuid.New(),
+				Username:       "testuser",
+				Password:       "hashedpassword",
+				MasterPassword: "hashedmasterpassword",
+				Salt:           "salt123",
+				CreatedAt:      time.Now(),
+				UpdatedAt:      time.Now(),
 			},
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("INSERT INTO users").
-					WithArgs(sqlmock.AnyArg(), "testuser", "hashedpassword", sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(sqlmock.AnyArg(), "testuser", "hashedpassword", "hashedmasterpassword", "salt123", sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnError(sql.ErrConnDone)
 			},
 			wantError: true,
@@ -125,10 +133,14 @@ func TestPostgresStorage_CreateUser(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			err = storage.CreateUser(tt.user)
+			err = storage.CreateUser(context.Background(), tt.user)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("CreateUser() error = %v, wantError %v", err, tt.wantError)
+			}
+
+			if tt.name == "duplicate user error" && err != nil && err != ErrUserExists {
+				t.Errorf("CreateUser() expected ErrUserExists, got %v", err)
 			}
 
 			if err := mock.ExpectationsWereMet(); err != nil {
@@ -149,9 +161,9 @@ func TestPostgresStorage_GetUserByUsername(t *testing.T) {
 			name:     "successful user retrieval",
 			username: "testuser",
 			mockSetup: func(mock sqlmock.Sqlmock) {
-				rows := sqlmock.NewRows([]string{"id", "username", "password", "created_at", "updated_at"}).
-					AddRow(uuid.New(), "testuser", "hashedpassword", time.Now(), time.Now())
-				mock.ExpectQuery("SELECT id, username, password, created_at, updated_at FROM users WHERE username = \\$1").
+				rows := sqlmock.NewRows([]string{"id", "username", "password", "master_password", "salt", "created_at", "updated_at"}).
+					AddRow(uuid.New(), "testuser", "hashedpassword", "hashedmasterpassword", "salt123", time.Now(), time.Now())
+				mock.ExpectQuery("SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE username = \\$1").
 					WithArgs("testuser").
 					WillReturnRows(rows)
 			},
@@ -161,7 +173,7 @@ func TestPostgresStorage_GetUserByUsername(t *testing.T) {
 			name:     "user not found",
 			username: "nonexistent",
 			mockSetup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT id, username, password, created_at, updated_at FROM users WHERE username = \\$1").
+				mock.ExpectQuery("SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE username = \\$1").
 					WithArgs("nonexistent").
 					WillReturnError(sql.ErrNoRows)
 			},
@@ -171,7 +183,7 @@ func TestPostgresStorage_GetUserByUsername(t *testing.T) {
 			name:     "database error",
 			username: "testuser",
 			mockSetup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT id, username, password, created_at, updated_at FROM users WHERE username = \\$1").
+				mock.ExpectQuery("SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE username = \\$1").
 					WithArgs("testuser").
 					WillReturnError(sql.ErrConnDone)
 			},
@@ -196,7 +208,7 @@ func TestPostgresStorage_GetUserByUsername(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			user, err := storage.GetUserByUsername(tt.username)
+			user, err := storage.GetUserByUsername(context.Background(), tt.username)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("GetUserByUsername() error = %v, wantError %v", err, tt.wantError)
@@ -225,9 +237,9 @@ func TestPostgresStorage_GetUserByID(t *testing.T) {
 			name:   "successful user retrieval",
 			userID: userID,
 			mockSetup: func(mock sqlmock.Sqlmock) {
-				rows := sqlmock.NewRows([]string{"id", "username", "password", "created_at", "updated_at"}).
-					AddRow(userID, "testuser", "hashedpassword", time.Now(), time.Now())
-				mock.ExpectQuery("SELECT id, username, password, created_at, updated_at FROM users WHERE id = \\$1").
+				rows := sqlmock.NewRows([]string{"id", "username", "password", "master_password", "salt", "created_at", "updated_at"}).
+					AddRow(userID, "testuser", "hashedpassword", "hashedmasterpassword", "salt123", time.Now(), time.Now())
+				mock.ExpectQuery("SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE id = \\$1").
 					WithArgs(userID).
 					WillReturnRows(rows)
 			},
@@ -237,7 +249,7 @@ func TestPostgresStorage_GetUserByID(t *testing.T) {
 			name:   "user not found",
 			userID: userID,
 			mockSetup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT id, username, password, created_at, updated_at FROM users WHERE id = \\$1").
+				mock.ExpectQuery("SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE id = \\$1").
 					WithArgs(userID).
 					WillReturnError(sql.ErrNoRows)
 			},
@@ -247,7 +259,7 @@ func TestPostgresStorage_GetUserByID(t *testing.T) {
 			name:   "database error",
 			userID: userID,
 			mockSetup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT id, username, password, created_at, updated_at FROM users WHERE id = \\$1").
+				mock.ExpectQuery("SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE id = \\$1").
 					WithArgs(userID).
 					WillReturnError(sql.ErrConnDone)
 			},
@@ -269,7 +281,7 @@ func TestPostgresStorage_GetUserByID(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			user, err := storage.GetUserByID(tt.userID)
+			user, err := storage.GetUserByID(context.Background(), tt.userID)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("GetUserByID() error = %v, wantError %v", err, tt.wantError)
@@ -349,7 +361,7 @@ func TestPostgresStorage_CreateData(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			err := storage.CreateData(tt.data)
+			err := storage.CreateData(context.Background(), tt.data)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("CreateData() error = %v, wantError %v", err, tt.wantError)
@@ -418,7 +430,7 @@ func TestPostgresStorage_GetDataByID(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			data, err := storage.GetDataByID(tt.dataID)
+			data, err := storage.GetDataByID(context.Background(), tt.dataID)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("GetDataByID() error = %v, wantError %v", err, tt.wantError)
@@ -493,7 +505,7 @@ func TestPostgresStorage_GetDataByUserID(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			dataList, err := storage.GetDataByUserID(tt.userID)
+			dataList, err := storage.GetDataByUserID(context.Background(), tt.userID)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("GetDataByUserID() error = %v, wantError %v", err, tt.wantError)
@@ -593,7 +605,7 @@ func TestPostgresStorage_UpdateData(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			err := storage.UpdateData(tt.data)
+			err := storage.UpdateData(context.Background(), tt.data)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("UpdateData() error = %v, wantError %v", err, tt.wantError)
@@ -660,7 +672,7 @@ func TestPostgresStorage_DeleteData(t *testing.T) {
 			}
 
 			storage := NewPostgresStorage(db)
-			err := storage.DeleteData(tt.dataID)
+			err := storage.DeleteData(context.Background(), tt.dataID)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("DeleteData() error = %v, wantError %v", err, tt.wantError)

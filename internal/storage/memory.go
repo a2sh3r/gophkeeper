@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -30,7 +31,7 @@ func NewMemoryStorage() *MemoryStorage {
 }
 
 // CreateUser creates new user
-func (s *MemoryStorage) CreateUser(user *models.User) error {
+func (s *MemoryStorage) CreateUser(ctx context.Context, user *models.User) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -43,7 +44,7 @@ func (s *MemoryStorage) CreateUser(user *models.User) error {
 }
 
 // GetUserByUsername gets user by username
-func (s *MemoryStorage) GetUserByUsername(username string) (*models.User, error) {
+func (s *MemoryStorage) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -56,7 +57,7 @@ func (s *MemoryStorage) GetUserByUsername(username string) (*models.User, error)
 }
 
 // GetUserByID gets user by ID
-func (s *MemoryStorage) GetUserByID(userID uuid.UUID) (*models.User, error) {
+func (s *MemoryStorage) GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -70,7 +71,7 @@ func (s *MemoryStorage) GetUserByID(userID uuid.UUID) (*models.User, error) {
 }
 
 // CreateData creates new data
-func (s *MemoryStorage) CreateData(data *models.Data) error {
+func (s *MemoryStorage) CreateData(ctx context.Context, data *models.Data) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -79,7 +80,7 @@ func (s *MemoryStorage) CreateData(data *models.Data) error {
 }
 
 // GetDataByID gets data by ID
-func (s *MemoryStorage) GetDataByID(dataID uuid.UUID) (*models.Data, error) {
+func (s *MemoryStorage) GetDataByID(ctx context.Context, dataID uuid.UUID) (*models.Data, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -92,7 +93,7 @@ func (s *MemoryStorage) GetDataByID(dataID uuid.UUID) (*models.Data, error) {
 }
 
 // GetDataByUserID gets all user data
-func (s *MemoryStorage) GetDataByUserID(userID uuid.UUID) ([]*models.Data, error) {
+func (s *MemoryStorage) GetDataByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Data, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -107,7 +108,7 @@ func (s *MemoryStorage) GetDataByUserID(userID uuid.UUID) ([]*models.Data, error
 }
 
 // UpdateData updates data
-func (s *MemoryStorage) UpdateData(data *models.Data) error {
+func (s *MemoryStorage) UpdateData(ctx context.Context, data *models.Data) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -120,7 +121,7 @@ func (s *MemoryStorage) UpdateData(data *models.Data) error {
 }
 
 // DeleteData deletes data
-func (s *MemoryStorage) DeleteData(dataID uuid.UUID) error {
+func (s *MemoryStorage) DeleteData(ctx context.Context, dataID uuid.UUID) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -22,11 +23,11 @@ func NewPostgresStorage(db *sql.DB) *PostgresStorage {
 }
 
 // CreateUser creates a new user in PostgreSQL
-func (s *PostgresStorage) CreateUser(user *models.User) error {
-	query := `INSERT INTO users (id, username, password, created_at, updated_at) 
-			  VALUES ($1, $2, $3, $4, $5)`
+func (s *PostgresStorage) CreateUser(ctx context.Context, user *models.User) error {
+	query := `INSERT INTO users (id, username, password, master_password, salt, created_at, updated_at) 
+			  VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
-	_, err := s.db.Exec(query, user.ID, user.Username, user.Password, user.CreatedAt, user.UpdatedAt)
+	_, err := s.db.ExecContext(ctx, query, user.ID, user.Username, user.Password, user.MasterPassword, user.Salt, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		if err.Error() == `duplicate key value violates unique constraint "users_username_key"` {
 			logger.Log.Warn("User already exists", zap.String("username", user.Username))
@@ -39,13 +40,13 @@ func (s *PostgresStorage) CreateUser(user *models.User) error {
 }
 
 // GetUserByUsername gets user by username
-func (s *PostgresStorage) GetUserByUsername(username string) (*models.User, error) {
-	query := `SELECT id, username, password, created_at, updated_at FROM users WHERE username = $1`
+func (s *PostgresStorage) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	query := `SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE username = $1`
 
-	row := s.db.QueryRow(query, username)
+	row := s.db.QueryRowContext(ctx, query, username)
 	user := &models.User{}
 
-	err := row.Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Username, &user.Password, &user.MasterPassword, &user.Salt, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logger.Log.Debug("User not found by username", zap.String("username", username))
@@ -59,13 +60,13 @@ func (s *PostgresStorage) GetUserByUsername(username string) (*models.User, erro
 }
 
 // GetUserByID gets user by ID
-func (s *PostgresStorage) GetUserByID(userID uuid.UUID) (*models.User, error) {
-	query := `SELECT id, username, password, created_at, updated_at FROM users WHERE id = $1`
+func (s *PostgresStorage) GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+	query := `SELECT id, username, password, master_password, salt, created_at, updated_at FROM users WHERE id = $1`
 
-	row := s.db.QueryRow(query, userID)
+	row := s.db.QueryRowContext(ctx, query, userID)
 	user := &models.User{}
 
-	err := row.Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Username, &user.Password, &user.MasterPassword, &user.Salt, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logger.Log.Debug("User not found by ID", zap.String("user_id", userID.String()))
@@ -79,11 +80,11 @@ func (s *PostgresStorage) GetUserByID(userID uuid.UUID) (*models.User, error) {
 }
 
 // CreateData creates new data
-func (s *PostgresStorage) CreateData(data *models.Data) error {
+func (s *PostgresStorage) CreateData(ctx context.Context, data *models.Data) error {
 	query := `INSERT INTO data (id, user_id, type, name, description, data, metadata, created_at, updated_at) 
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
-	_, err := s.db.Exec(query, data.ID, data.UserID, data.Type, data.Name, data.Description,
+	_, err := s.db.ExecContext(ctx, query, data.ID, data.UserID, data.Type, data.Name, data.Description,
 		data.Data, data.Metadata, data.CreatedAt, data.UpdatedAt)
 	if err != nil {
 		logger.Log.Error("Failed to create data in database", zap.Error(err),
@@ -94,11 +95,11 @@ func (s *PostgresStorage) CreateData(data *models.Data) error {
 }
 
 // GetDataByID gets data by ID
-func (s *PostgresStorage) GetDataByID(dataID uuid.UUID) (*models.Data, error) {
+func (s *PostgresStorage) GetDataByID(ctx context.Context, dataID uuid.UUID) (*models.Data, error) {
 	query := `SELECT id, user_id, type, name, description, data, metadata, created_at, updated_at 
 			  FROM data WHERE id = $1`
 
-	row := s.db.QueryRow(query, dataID)
+	row := s.db.QueryRowContext(ctx, query, dataID)
 	data := &models.Data{}
 
 	err := row.Scan(&data.ID, &data.UserID, &data.Type, &data.Name, &data.Description,
@@ -116,11 +117,11 @@ func (s *PostgresStorage) GetDataByID(dataID uuid.UUID) (*models.Data, error) {
 }
 
 // GetDataByUserID gets all data for a user
-func (s *PostgresStorage) GetDataByUserID(userID uuid.UUID) ([]*models.Data, error) {
+func (s *PostgresStorage) GetDataByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Data, error) {
 	query := `SELECT id, user_id, type, name, description, data, metadata, created_at, updated_at 
 			  FROM data WHERE user_id = $1 ORDER BY created_at DESC`
 
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		logger.Log.Error("Failed to query user data", zap.Error(err), zap.String("user_id", userID.String()))
 		return nil, fmt.Errorf("failed to query data: %w", err)
@@ -152,11 +153,11 @@ func (s *PostgresStorage) GetDataByUserID(userID uuid.UUID) ([]*models.Data, err
 }
 
 // UpdateData updates data
-func (s *PostgresStorage) UpdateData(data *models.Data) error {
+func (s *PostgresStorage) UpdateData(ctx context.Context, data *models.Data) error {
 	query := `UPDATE data SET type = $2, name = $3, description = $4, data = $5, metadata = $6, updated_at = $7 
 			  WHERE id = $1`
 
-	result, err := s.db.Exec(query, data.ID, data.Type, data.Name, data.Description,
+	result, err := s.db.ExecContext(ctx, query, data.ID, data.Type, data.Name, data.Description,
 		data.Data, data.Metadata, data.UpdatedAt)
 	if err != nil {
 		logger.Log.Error("Failed to update data in database", zap.Error(err),
@@ -180,10 +181,10 @@ func (s *PostgresStorage) UpdateData(data *models.Data) error {
 }
 
 // DeleteData deletes data
-func (s *PostgresStorage) DeleteData(dataID uuid.UUID) error {
+func (s *PostgresStorage) DeleteData(ctx context.Context, dataID uuid.UUID) error {
 	query := `DELETE FROM data WHERE id = $1`
 
-	result, err := s.db.Exec(query, dataID)
+	result, err := s.db.ExecContext(ctx, query, dataID)
 	if err != nil {
 		logger.Log.Error("Failed to delete data from database", zap.Error(err),
 			zap.String("data_id", dataID.String()))

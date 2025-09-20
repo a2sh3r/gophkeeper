@@ -125,7 +125,6 @@ func NewServerConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to load config file: %w", err)
 	}
 
-	// Parse command line flags to override values
 	cfg.ParseFlags()
 
 	return cfg, nil
@@ -237,7 +236,6 @@ func (cfg *Config) GetServerAddr() string {
 func Load() *Config {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
-		// Fallback to basic config if parsing fails
 		return &Config{
 			Server: ServerConfig{
 				Host: "localhost",
@@ -259,7 +257,6 @@ func Load() *Config {
 		}
 	}
 
-	// Parse command line flags to override values
 	cfg.ParseFlags()
 
 	return cfg

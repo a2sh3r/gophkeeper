@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -28,8 +29,9 @@ func TestServer_Register(t *testing.T) {
 		{
 			name: "valid registration",
 			req: models.UserRequest{
-				Username: "testuser",
-				Password: "password123",
+				Username:       "testuser",
+				Password:       "password123",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -37,8 +39,9 @@ func TestServer_Register(t *testing.T) {
 		{
 			name: "empty username",
 			req: models.UserRequest{
-				Username: "",
-				Password: "password123",
+				Username:       "",
+				Password:       "password123",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -46,8 +49,9 @@ func TestServer_Register(t *testing.T) {
 		{
 			name: "empty password",
 			req: models.UserRequest{
-				Username: "testuser",
-				Password: "",
+				Username:       "testuser",
+				Password:       "",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -105,7 +109,7 @@ func TestServer_Register_DuplicateUser(t *testing.T) {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if err := storage.CreateUser(user); err != nil {
+	if err := storage.CreateUser(context.Background(), user); err != nil {
 		logger.Log.Error("Failed to create user", zap.Error(err), zap.String("username", user.Username))
 	}
 
@@ -113,8 +117,9 @@ func TestServer_Register_DuplicateUser(t *testing.T) {
 	server.RegisterRoutes(router)
 
 	reqBody := models.UserRequest{
-		Username: "testuser",
-		Password: "password123",
+		Username:       "testuser",
+		Password:       "password123",
+		MasterPassword: "masterPassword123!",
 	}
 
 	jsonBody, _ := json.Marshal(reqBody)
@@ -180,7 +185,7 @@ func TestServer_Login(t *testing.T) {
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),
 				}
-				if err := storage.CreateUser(user); err != nil {
+				if err := storage.CreateUser(context.Background(), user); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("username", user.Username))
 				}
 			}
@@ -346,7 +351,7 @@ func TestServer_GetData(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(data); err != nil {
+				if err := storage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 			}
@@ -430,7 +435,7 @@ func TestServer_GetDataByID(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(data); err != nil {
+				if err := storage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 				dataID = data.ID.String()
@@ -539,7 +544,7 @@ func TestServer_UpdateData(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(data); err != nil {
+				if err := storage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 				dataID = data.ID.String()
@@ -628,7 +633,7 @@ func TestServer_DeleteData(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(data); err != nil {
+				if err := storage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 				dataID = data.ID.String()
@@ -749,7 +754,7 @@ func TestServer_HandleRegister_StorageError(t *testing.T) {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if err := storage.CreateUser(user); err != nil {
+	if err := storage.CreateUser(context.Background(), user); err != nil {
 		logger.Log.Error("Failed to create user", zap.Error(err), zap.String("username", user.Username))
 	}
 
@@ -757,8 +762,9 @@ func TestServer_HandleRegister_StorageError(t *testing.T) {
 	server.RegisterRoutes(router)
 
 	reqBody := models.UserRequest{
-		Username: "testuser",
-		Password: "password123",
+		Username:       "testuser",
+		Password:       "password123",
+		MasterPassword: "masterPassword123!",
 	}
 
 	jsonBody, _ := json.Marshal(reqBody)
@@ -818,7 +824,7 @@ func TestServer_HandleGetDataByID_AccessDenied(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := storage.CreateData(data); err != nil {
+	if err := storage.CreateData(context.Background(), data); err != nil {
 		logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 	}
 
@@ -856,7 +862,7 @@ func TestServer_HandleUpdateData_AccessDenied(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := storage.CreateData(data); err != nil {
+	if err := storage.CreateData(context.Background(), data); err != nil {
 		logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 	}
 
@@ -902,7 +908,7 @@ func TestServer_HandleDeleteData_AccessDenied(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := storage.CreateData(data); err != nil {
+	if err := storage.CreateData(context.Background(), data); err != nil {
 		logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 	}
 
@@ -1042,8 +1048,9 @@ func TestServer_handleRegister(t *testing.T) {
 		{
 			name: "valid registration",
 			req: models.UserRequest{
-				Username: "testuser",
-				Password: "password123",
+				Username:       "testuser",
+				Password:       "password123",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -1051,8 +1058,9 @@ func TestServer_handleRegister(t *testing.T) {
 		{
 			name: "empty username",
 			req: models.UserRequest{
-				Username: "",
-				Password: "password123",
+				Username:       "",
+				Password:       "password123",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -1060,8 +1068,9 @@ func TestServer_handleRegister(t *testing.T) {
 		{
 			name: "empty password",
 			req: models.UserRequest{
-				Username: "testuser",
-				Password: "",
+				Username:       "testuser",
+				Password:       "",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -1069,8 +1078,9 @@ func TestServer_handleRegister(t *testing.T) {
 		{
 			name: "invalid JSON",
 			req: models.UserRequest{
-				Username: "testuser",
-				Password: "password123",
+				Username:       "testuser",
+				Password:       "password123",
+				MasterPassword: "masterPassword123!",
 			},
 			expectedStatus: http.StatusBadRequest,
 			wantErr:        true,
@@ -1176,7 +1186,7 @@ func TestServer_handleLogin(t *testing.T) {
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),
 				}
-				if err := mockStorage.CreateUser(user); err != nil {
+				if err := mockStorage.CreateUser(context.Background(), user); err != nil {
 					t.Fatalf("Failed to create user: %v", err)
 				}
 			}
@@ -1256,7 +1266,7 @@ func TestServer_handleGetData(t *testing.T) {
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),
 				}
-				if err := mockStorage.CreateUser(user); err != nil {
+				if err := mockStorage.CreateUser(context.Background(), user); err != nil {
 					t.Fatalf("Failed to create user: %v", err)
 				}
 

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func TestMemoryStorage_CreateUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			storage := NewMemoryStorage()
-			err := storage.CreateUser(tt.user)
+			err := storage.CreateUser(context.Background(), tt.user)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateUser() error = %v, wantErr %v", err, tt.wantErr)
@@ -49,7 +50,7 @@ func TestMemoryStorage_CreateUser(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				retrievedUser, err := storage.GetUserByUsername(tt.user.Username)
+				retrievedUser, err := storage.GetUserByUsername(context.Background(), tt.user.Username)
 				if err != nil {
 					t.Errorf("Failed to get user: %v", err)
 					return
@@ -72,7 +73,7 @@ func TestMemoryStorage_CreateUser_Duplicate(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 
-	err := storage.CreateUser(user)
+	err := storage.CreateUser(context.Background(), user)
 	if err != nil {
 		t.Fatalf("Failed to create user: %v", err)
 	}
@@ -85,7 +86,7 @@ func TestMemoryStorage_CreateUser_Duplicate(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 
-	err = storage.CreateUser(duplicateUser)
+	err = storage.CreateUser(context.Background(), duplicateUser)
 	if err != ErrUserExists {
 		t.Errorf("Expected ErrUserExists, got %v", err)
 	}
@@ -101,7 +102,7 @@ func TestMemoryStorage_GetUserByUsername(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 
-	err := storage.CreateUser(user)
+	err := storage.CreateUser(context.Background(), user)
 	if err != nil {
 		t.Fatalf("Failed to create user: %v", err)
 	}
@@ -130,7 +131,7 @@ func TestMemoryStorage_GetUserByUsername(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := storage.GetUserByUsername(tt.username)
+			_, err := storage.GetUserByUsername(context.Background(), tt.username)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetUserByUsername() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -149,7 +150,7 @@ func TestMemoryStorage_GetUserByID(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 
-	err := storage.CreateUser(user)
+	err := storage.CreateUser(context.Background(), user)
 	if err != nil {
 		t.Fatalf("Failed to create user: %v", err)
 	}
@@ -173,7 +174,7 @@ func TestMemoryStorage_GetUserByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := storage.GetUserByID(tt.id)
+			_, err := storage.GetUserByID(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetUserByID() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -224,7 +225,7 @@ func TestMemoryStorage_CreateData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := storage.CreateData(tt.data)
+			err := storage.CreateData(context.Background(), tt.data)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateData() error = %v, wantErr %v", err, tt.wantErr)
@@ -232,7 +233,7 @@ func TestMemoryStorage_CreateData(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				retrievedData, err := storage.GetDataByID(tt.data.ID)
+				retrievedData, err := storage.GetDataByID(context.Background(), tt.data.ID)
 				if err != nil {
 					t.Errorf("Failed to get data: %v", err)
 					return
@@ -263,7 +264,7 @@ func TestMemoryStorage_GetDataByUserID(t *testing.T) {
 			UpdatedAt:   time.Now(),
 		}
 
-		err := storage.CreateData(data)
+		err := storage.CreateData(context.Background(), data)
 		if err != nil {
 			t.Fatalf("Failed to create data: %v", err)
 		}
@@ -281,7 +282,7 @@ func TestMemoryStorage_GetDataByUserID(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	err := storage.CreateData(data2)
+	err := storage.CreateData(context.Background(), data2)
 	if err != nil {
 		t.Fatalf("Failed to create data: %v", err)
 	}
@@ -310,7 +311,7 @@ func TestMemoryStorage_GetDataByUserID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := storage.GetDataByUserID(tt.userID)
+			data, err := storage.GetDataByUserID(context.Background(), tt.userID)
 			if err != nil {
 				t.Errorf("GetDataByUserID() error = %v", err)
 				return
@@ -338,7 +339,7 @@ func TestMemoryStorage_UpdateData(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	err := storage.CreateData(data)
+	err := storage.CreateData(context.Background(), data)
 	if err != nil {
 		t.Fatalf("Failed to create data: %v", err)
 	}
@@ -382,7 +383,7 @@ func TestMemoryStorage_UpdateData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := storage.UpdateData(tt.updateData)
+			err := storage.UpdateData(context.Background(), tt.updateData)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateData() error = %v, wantErr %v", err, tt.wantErr)
@@ -390,7 +391,7 @@ func TestMemoryStorage_UpdateData(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				retrievedData, err := storage.GetDataByID(tt.updateData.ID)
+				retrievedData, err := storage.GetDataByID(context.Background(), tt.updateData.ID)
 				if err != nil {
 					t.Errorf("Failed to get updated data: %v", err)
 					return
@@ -418,7 +419,7 @@ func TestMemoryStorage_DeleteData(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	err := storage.CreateData(data)
+	err := storage.CreateData(context.Background(), data)
 	if err != nil {
 		t.Fatalf("Failed to create data: %v", err)
 	}
@@ -442,7 +443,7 @@ func TestMemoryStorage_DeleteData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := storage.DeleteData(tt.dataID)
+			err := storage.DeleteData(context.Background(), tt.dataID)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteData() error = %v, wantErr %v", err, tt.wantErr)
@@ -450,7 +451,7 @@ func TestMemoryStorage_DeleteData(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				_, err = storage.GetDataByID(tt.dataID)
+				_, err = storage.GetDataByID(context.Background(), tt.dataID)
 				if err != ErrDataNotFound {
 					t.Errorf("Expected ErrDataNotFound, got %v", err)
 				}

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,34 +37,42 @@ func (c *Client) SetToken(token string) {
 }
 
 // Register registers new user
-func (c *Client) Register(username, password string) (*models.AuthResponse, error) {
+func (c *Client) Register(ctx context.Context, username, password, masterPassword string) (*models.AuthResponse, error) {
 	req := models.UserRequest{
-		Username: username,
-		Password: password,
+		Username:       username,
+		Password:       password,
+		MasterPassword: masterPassword,
 	}
 
-	return c.authRequest("/api/v1/register", req)
+	return c.authRequest(ctx, "/api/v1/register", req)
 }
 
 // Login authenticates user
-func (c *Client) Login(username, password string) (*models.AuthResponse, error) {
+func (c *Client) Login(ctx context.Context, username, password string) (*models.AuthResponse, error) {
 	req := models.LoginRequest{
 		Username: username,
 		Password: password,
 	}
 
-	return c.authRequest("/api/v1/login", req)
+	return c.authRequest(ctx, "/api/v1/login", req)
 }
 
 // authRequest performs authentication request
-func (c *Client) authRequest(endpoint string, req interface{}) (*models.AuthResponse, error) {
+func (c *Client) authRequest(ctx context.Context, endpoint string, req interface{}) (*models.AuthResponse, error) {
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		logger.Log.Error("Failed to marshal auth request", zap.Error(err), zap.String("endpoint", endpoint))
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := c.httpClient.Post(c.baseURL+endpoint, "application/json", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		logger.Log.Error("Failed to create auth request", zap.Error(err), zap.String("endpoint", endpoint))
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		logger.Log.Error("Auth request failed", zap.Error(err), zap.String("endpoint", endpoint))
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -101,8 +110,8 @@ func (c *Client) authRequest(endpoint string, req interface{}) (*models.AuthResp
 }
 
 // GetData gets all user data
-func (c *Client) GetData() ([]models.Data, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/data", nil)
+func (c *Client) GetData(ctx context.Context) ([]models.Data, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/v1/data", nil)
 	if err != nil {
 		logger.Log.Error("Failed to create GET data request", zap.Error(err))
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -149,14 +158,14 @@ func (c *Client) GetData() ([]models.Data, error) {
 }
 
 // CreateData creates new data
-func (c *Client) CreateData(dataReq models.DataRequest) (*models.Data, error) {
+func (c *Client) CreateData(ctx context.Context, dataReq models.DataRequest) (*models.Data, error) {
 	jsonData, err := json.Marshal(dataReq)
 	if err != nil {
 		logger.Log.Error("Failed to marshal create data request", zap.Error(err))
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/data", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/v1/data", bytes.NewBuffer(jsonData))
 	if err != nil {
 		logger.Log.Error("Failed to create POST data request", zap.Error(err))
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -204,8 +213,8 @@ func (c *Client) CreateData(dataReq models.DataRequest) (*models.Data, error) {
 }
 
 // GetDataByID gets data by ID
-func (c *Client) GetDataByID(id string) (*models.Data, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/data/"+id, nil)
+func (c *Client) GetDataByID(ctx context.Context, id string) (*models.Data, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/v1/data/"+id, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -244,13 +253,13 @@ func (c *Client) GetDataByID(id string) (*models.Data, error) {
 }
 
 // UpdateData updates data
-func (c *Client) UpdateData(id string, dataReq models.DataRequest) (*models.Data, error) {
+func (c *Client) UpdateData(ctx context.Context, id string, dataReq models.DataRequest) (*models.Data, error) {
 	jsonData, err := json.Marshal(dataReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("PUT", c.baseURL+"/api/v1/data/"+id, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "PUT", c.baseURL+"/api/v1/data/"+id, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -290,8 +299,8 @@ func (c *Client) UpdateData(id string, dataReq models.DataRequest) (*models.Data
 }
 
 // DeleteData deletes data
-func (c *Client) DeleteData(id string) error {
-	req, err := http.NewRequest("DELETE", c.baseURL+"/api/v1/data/"+id, nil)
+func (c *Client) DeleteData(ctx context.Context, id string) error {
+	req, err := http.NewRequestWithContext(ctx, "DELETE", c.baseURL+"/api/v1/data/"+id, nil)
 	if err != nil {
 		logger.Log.Error("Failed to create DELETE data request", zap.Error(err), zap.String("data_id", id))
 		return fmt.Errorf("failed to create request: %w", err)
