@@ -214,23 +214,23 @@ func (cfg *Config) ParseFlags() {
 }
 
 // GetDSN returns database connection string.
-func (c *Config) GetDSN() string {
-	if c.Database.Type == "postgres" {
+func (cfg *Config) GetDSN() string {
+	if cfg.Database.Type == "postgres" {
 		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-			c.Database.User,
-			c.Database.Password,
-			c.Database.Host,
-			c.Database.Port,
-			c.Database.Name,
-			c.Database.SSLMode,
+			cfg.Database.User,
+			cfg.Database.Password,
+			cfg.Database.Host,
+			cfg.Database.Port,
+			cfg.Database.Name,
+			cfg.Database.SSLMode,
 		)
 	}
 	return ""
 }
 
 // GetServerAddr returns server address.
-func (c *Config) GetServerAddr() string {
-	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
+func (cfg *Config) GetServerAddr() string {
+	return fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 }
 
 // Load is a compatibility function for backward compatibility.
