@@ -3,6 +3,14 @@ VERSION := 1.0.0
 BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
+DB_HOST ?= localhost
+DB_PORT ?= 5432
+DB_NAME ?= gophkeeper
+DB_USER ?= postgres
+DB_PASSWORD ?= postgres
+DB_SSLMODE ?= disable
+DSN := postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
+
 
 .PHONY: all
 all: clean build-all
@@ -82,3 +90,48 @@ lint:
 	@echo "🔍 Running linter..."
 	@go vet ./...
 	@golangci-lint run
+
+.PHONY: migrate-up
+migrate-up:
+	@echo "Running database migrations..."
+	@migrate -path migrations -database "$(DSN)" up
+	@echo "Migrations completed"
+
+.PHONY: migrate-down
+migrate-down:
+	@echo "Rolling back database migrations..."
+	@migrate -path migrations -database "$(DSN)" down
+	@echo "Rollback completed"
+
+.PHONY: migrate-force
+migrate-force:
+	@echo "Force setting migration version..."
+	@migrate -path migrations -database "$(DSN)" force $(VERSION)
+	@echo "Migration version forced"
+
+.PHONY: migrate-create
+migrate-create:
+	@echo "Creating new migration..."
+	@migrate create -ext sql -dir migrations -seq $(NAME)
+	@echo "Migration created"
+
+.PHONY: env-setup
+env-setup:
+	@echo "Setting up environment..."
+	@if [ ! -f .env ]; then \
+		cp env.example .env; \
+		echo "Created .env file from env.example"; \
+		echo "Please edit .env file with your actual values"; \
+	else \
+		echo ".env file already exists"; \
+	fi
+
+.PHONY: load-env
+load-env:
+	@echo "Loading environment variables..."
+	@if [ -f .env ]; then \
+		export $$(cat .env | grep -v '^#' | xargs); \
+		echo "Environment variables loaded"; \
+	else \
+		echo ".env file not found. Run 'make env-setup' first"; \
+	fi

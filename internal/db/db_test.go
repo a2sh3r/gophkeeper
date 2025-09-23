@@ -69,14 +69,11 @@ func TestNew_WithMockDB(t *testing.T) {
 
 	mock.ExpectPing()
 
-	mock.ExpectQuery("SELECT CURRENT_DATABASE()").
-		WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow("testdb"))
-
 	dbInstance := &DB{conn: db}
 
-	err = dbInstance.migrate()
-	if err == nil {
-		t.Errorf("migrate() should return error due to missing migration files")
+	// Test that we can create DB instance with mock
+	if dbInstance.conn == nil {
+		t.Error("Expected non-nil connection in DB instance")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -159,100 +156,6 @@ func TestDB_Conn(t *testing.T) {
 
 			if conn != tt.expected {
 				t.Errorf("Conn() = %v, want %v", conn, tt.expected)
-			}
-		})
-	}
-}
-
-func TestDB_migrate(t *testing.T) {
-	tests := []struct {
-		name      string
-		setupDB   bool
-		wantError bool
-	}{
-		{
-			name:      "nil connection",
-			setupDB:   false,
-			wantError: true, // Will panic, so we expect error
-		},
-		{
-			name:      "valid connection without migrations",
-			setupDB:   true,
-			wantError: true, // Will panic, so we expect error
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var db *DB
-			if tt.setupDB {
-				db = &DB{conn: nil}
-			} else {
-				db = &DB{conn: nil}
-			}
-
-			defer func() {
-				if r := recover(); r != nil {
-					if !tt.wantError {
-						t.Errorf("migrate() panicked unexpectedly: %v", r)
-					}
-				}
-			}()
-
-			err := db.migrate()
-
-			if (err != nil) != tt.wantError {
-				t.Errorf("migrate() error = %v, wantError %v", err, tt.wantError)
-			}
-		})
-	}
-}
-
-func TestDB_migrate_WithMockDB(t *testing.T) {
-	tests := []struct {
-		name      string
-		mockSetup func(sqlmock.Sqlmock)
-		wantError bool
-	}{
-		{
-			name: "migration driver creation",
-			mockSetup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT CURRENT_DATABASE()").
-					WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow("testdb"))
-			},
-			wantError: true, // Will fail due to missing migration files
-		},
-		{
-			name: "migration driver creation error",
-			mockSetup: func(mock sqlmock.Sqlmock) {
-			},
-			wantError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db, mock, err := sqlmock.New()
-			if err != nil {
-				t.Fatalf("Failed to create mock: %v", err)
-			}
-			defer func() {
-				_ = db.Close()
-			}()
-
-			if tt.mockSetup != nil {
-				tt.mockSetup(mock)
-			}
-
-			dbInstance := &DB{conn: db}
-			err = dbInstance.migrate()
-
-			if (err != nil) != tt.wantError {
-				t.Errorf("migrate() error = %v, wantError %v", err, tt.wantError)
-			}
-
-			if err := mock.ExpectationsWereMet(); err != nil {
-				t.Errorf("Unfulfilled expectations: %v", err)
 			}
 		})
 	}

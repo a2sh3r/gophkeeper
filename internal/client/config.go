@@ -21,7 +21,7 @@ type Config struct {
 }
 
 // LoadConfig loads configuration from file
-func LoadConfig() *Config {
+func NewConfig() *Config {
 	config := &Config{}
 
 	homeDir, err := os.UserHomeDir()

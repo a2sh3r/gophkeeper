@@ -1,0 +1,81 @@
+name: Database Migrations
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'migrations/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'migrations/**' ]
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gophkeeper
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install migrate CLI
+      run: |
+        curl -L https://github.com/golang-migrate/migrate/releases/latest/download/migrate.linux-amd64.tar.gz | tar xvz
+        sudo mv migrate /usr/local/bin/
+        migrate -version
+    
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL to be ready..."
+          sleep 2
+        done
+        echo "PostgreSQL is ready!"
+    
+    - name: Check migration files
+      run: |
+        echo "Migration files:"
+        ls -la migrations/
+        echo "Total migration files: $(find migrations -name '*.up.sql' | wc -l)"
+    
+    - name: Run migrations up
+      env:
+        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper_test?sslmode=disable
+      run: |
+        echo "Running migrations up..."
+        migrate -path migrations -database "$DSN" up
+        echo "Current migration version:"
+        migrate -path migrations -database "$DSN" version
+    
+    - name: Test migration rollback
+      env:
+        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper_test?sslmode=disable
+      run: |
+        echo "Testing rollback..."
+        migrate -path migrations -database "$DSN" down 1
+        echo "Version after rollback:"
+        migrate -path migrations -database "$DSN" version
+        echo "Running migrations up again..."
+        migrate -path migrations -database "$DSN" up
+        echo "Final version:"
+        migrate -path migrations -database "$DSN" version
+    
+    - name: Verify database schema
+      env:
+        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper_test?sslmode=disable
+      run: |
+        echo "Checking database tables:"
+        PGPASSWORD=postgres psql -h localhost -U postgres -d gophkeeper_test -c "\dt"

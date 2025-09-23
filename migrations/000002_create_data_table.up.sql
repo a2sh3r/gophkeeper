@@ -12,3 +12,5 @@ CREATE TABLE IF NOT EXISTS data (
 
 CREATE INDEX IF NOT EXISTS idx_data_user_id ON data(user_id);
 CREATE INDEX IF NOT EXISTS idx_data_type ON data(type);
+
+

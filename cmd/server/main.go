@@ -36,7 +36,8 @@ func main() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
-	var store server.Storage
+	var userStore server.UserStorage
+	var dataStore server.DataStorage
 
 	switch cfg.Database.Type {
 	case "postgres":
@@ -50,20 +51,20 @@ func main() {
 				logger.Log.Error("Failed to close database", zap.Error(err))
 			}
 		}()
-		store = storage.NewPostgresStorage(database.Conn())
+		userStore = storage.NewPostgresStorage(database.Conn())
+		dataStore = storage.NewPostgresStorage(database.Conn())
 	case "memory":
 		logger.Log.Info("Using in-memory storage")
-		store = storage.NewMemoryStorage()
+		userStore = storage.NewMemoryStorage()
+		dataStore = storage.NewMemoryStorage()
 	default:
 		logger.Log.Fatal("Unsupported database type", zap.String("type", cfg.Database.Type))
 	}
 
 	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.TokenExpiry)
 
-	srv := server.NewServer(store, jwtManager)
-
 	router := mux.NewRouter()
-	srv.RegisterRoutes(router)
+	server.RegisterRoutes(router, userStore, dataStore, jwtManager)
 
 	n := negroni.New()
 	n.Use(negroni.NewLogger())

@@ -47,3 +47,5 @@ func AsyncError(msg string, fields ...zap.Field) {
 		Log.Error(msg, fields...)
 	}()
 }
+
+

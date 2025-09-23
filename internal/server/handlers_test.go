@@ -60,12 +60,12 @@ func TestServer_Register(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			jsonBody, _ := json.Marshal(tt.req)
 			req := httptest.NewRequest("POST", "/api/v1/register", bytes.NewBuffer(jsonBody))
@@ -97,9 +97,9 @@ func TestServer_Register(t *testing.T) {
 }
 
 func TestServer_Register_DuplicateUser(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	user := &models.User{
@@ -109,12 +109,12 @@ func TestServer_Register_DuplicateUser(t *testing.T) {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if err := storage.CreateUser(context.Background(), user); err != nil {
+	if err := userStorage.CreateUser(context.Background(), user); err != nil {
 		logger.Log.Error("Failed to create user", zap.Error(err), zap.String("username", user.Username))
 	}
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	reqBody := models.UserRequest{
 		Username:       "testuser",
@@ -172,9 +172,9 @@ func TestServer_Login(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			if tt.name == "valid login" {
 				hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
@@ -185,13 +185,13 @@ func TestServer_Login(t *testing.T) {
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),
 				}
-				if err := storage.CreateUser(context.Background(), user); err != nil {
+				if err := userStorage.CreateUser(context.Background(), user); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("username", user.Username))
 				}
 			}
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			jsonBody, _ := json.Marshal(tt.req)
 			req := httptest.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(jsonBody))
@@ -269,15 +269,15 @@ func TestServer_CreateData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			userID := uuid.New()
 			token, _ := jwtManager.GenerateToken(userID, "testuser")
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			jsonBody, _ := json.Marshal(tt.req)
 			req := httptest.NewRequest("POST", "/api/v1/data", bytes.NewBuffer(jsonBody))
@@ -332,9 +332,9 @@ func TestServer_GetData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			userID := uuid.New()
 			token, _ := jwtManager.GenerateToken(userID, "testuser")
@@ -351,13 +351,13 @@ func TestServer_GetData(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(context.Background(), data); err != nil {
+				if err := dataStorage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 			}
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			req := httptest.NewRequest("GET", "/api/v1/data", nil)
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -416,9 +416,9 @@ func TestServer_GetDataByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			token, _ := jwtManager.GenerateToken(tt.userID, "testuser")
 
@@ -435,7 +435,7 @@ func TestServer_GetDataByID(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(context.Background(), data); err != nil {
+				if err := dataStorage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 				dataID = data.ID.String()
@@ -444,7 +444,7 @@ func TestServer_GetDataByID(t *testing.T) {
 			}
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			req := httptest.NewRequest("GET", "/api/v1/data/"+dataID, nil)
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -525,9 +525,9 @@ func TestServer_UpdateData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			token, _ := jwtManager.GenerateToken(tt.userID, "testuser")
 
@@ -544,7 +544,7 @@ func TestServer_UpdateData(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(context.Background(), data); err != nil {
+				if err := dataStorage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 				dataID = data.ID.String()
@@ -553,7 +553,7 @@ func TestServer_UpdateData(t *testing.T) {
 			}
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			jsonBody, _ := json.Marshal(tt.req)
 			req := httptest.NewRequest("PUT", "/api/v1/data/"+dataID, bytes.NewBuffer(jsonBody))
@@ -614,9 +614,9 @@ func TestServer_DeleteData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := storage.NewMemoryStorage()
+			userStorage := storage.NewMemoryStorage()
+			dataStorage := storage.NewMemoryStorage()
 			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(storage, jwtManager)
 
 			token, _ := jwtManager.GenerateToken(tt.userID, "testuser")
 
@@ -633,7 +633,7 @@ func TestServer_DeleteData(t *testing.T) {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				if err := storage.CreateData(context.Background(), data); err != nil {
+				if err := dataStorage.CreateData(context.Background(), data); err != nil {
 					logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 				}
 				dataID = data.ID.String()
@@ -642,7 +642,7 @@ func TestServer_DeleteData(t *testing.T) {
 			}
 
 			router := mux.NewRouter()
-			server.RegisterRoutes(router)
+			RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 			req := httptest.NewRequest("DELETE", "/api/v1/data/"+dataID, nil)
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -658,12 +658,12 @@ func TestServer_DeleteData(t *testing.T) {
 }
 
 func TestServer_HandleRegister_InvalidJSON(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("POST", "/api/v1/register", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -677,12 +677,12 @@ func TestServer_HandleRegister_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleLogin_InvalidJSON(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("POST", "/api/v1/login", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -696,15 +696,15 @@ func TestServer_HandleLogin_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleCreateData_InvalidJSON(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID := uuid.New()
 	token, _ := jwtManager.GenerateToken(userID, "testuser")
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("POST", "/api/v1/data", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -719,15 +719,15 @@ func TestServer_HandleCreateData_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleUpdateData_InvalidJSON(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID := uuid.New()
 	token, _ := jwtManager.GenerateToken(userID, "testuser")
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("PUT", "/api/v1/data/550e8400-e29b-41d4-a716-446655440000", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -742,9 +742,9 @@ func TestServer_HandleUpdateData_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleRegister_StorageError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	user := &models.User{
@@ -754,12 +754,12 @@ func TestServer_HandleRegister_StorageError(t *testing.T) {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if err := storage.CreateUser(context.Background(), user); err != nil {
+	if err := userStorage.CreateUser(context.Background(), user); err != nil {
 		logger.Log.Error("Failed to create user", zap.Error(err), zap.String("username", user.Username))
 	}
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	reqBody := models.UserRequest{
 		Username:       "testuser",
@@ -780,12 +780,12 @@ func TestServer_HandleRegister_StorageError(t *testing.T) {
 }
 
 func TestServer_HandleLogin_StorageError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	reqBody := models.LoginRequest{
 		Username: "nonexistent",
@@ -805,9 +805,9 @@ func TestServer_HandleLogin_StorageError(t *testing.T) {
 }
 
 func TestServer_HandleGetDataByID_AccessDenied(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID1 := uuid.New()
 	userID2 := uuid.New()
@@ -824,12 +824,12 @@ func TestServer_HandleGetDataByID_AccessDenied(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := storage.CreateData(context.Background(), data); err != nil {
+	if err := dataStorage.CreateData(context.Background(), data); err != nil {
 		logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 	}
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("GET", "/api/v1/data/"+data.ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -843,9 +843,9 @@ func TestServer_HandleGetDataByID_AccessDenied(t *testing.T) {
 }
 
 func TestServer_HandleUpdateData_AccessDenied(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID1 := uuid.New()
 	userID2 := uuid.New()
@@ -862,12 +862,12 @@ func TestServer_HandleUpdateData_AccessDenied(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := storage.CreateData(context.Background(), data); err != nil {
+	if err := dataStorage.CreateData(context.Background(), data); err != nil {
 		logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 	}
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	reqBody := models.DataRequest{
 		Type: models.DataTypeText,
@@ -889,9 +889,9 @@ func TestServer_HandleUpdateData_AccessDenied(t *testing.T) {
 }
 
 func TestServer_HandleDeleteData_AccessDenied(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID1 := uuid.New()
 	userID2 := uuid.New()
@@ -908,12 +908,12 @@ func TestServer_HandleDeleteData_AccessDenied(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := storage.CreateData(context.Background(), data); err != nil {
+	if err := dataStorage.CreateData(context.Background(), data); err != nil {
 		logger.Log.Error("Failed to create data", zap.Error(err), zap.String("data name", data.Name))
 	}
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/data/"+data.ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -927,12 +927,12 @@ func TestServer_HandleDeleteData_AccessDenied(t *testing.T) {
 }
 
 func TestServer_HandleRegister_InternalError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("POST", "/api/v1/register", bytes.NewBufferString("invalid json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -946,12 +946,12 @@ func TestServer_HandleRegister_InternalError(t *testing.T) {
 }
 
 func TestServer_HandleLogin_InternalError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("POST", "/api/v1/login", bytes.NewBufferString("invalid json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -965,15 +965,15 @@ func TestServer_HandleLogin_InternalError(t *testing.T) {
 }
 
 func TestServer_HandleGetData_InternalError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID := uuid.New()
 	token, _ := jwtManager.GenerateToken(userID, "testuser")
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("GET", "/api/v1/data", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -987,15 +987,15 @@ func TestServer_HandleGetData_InternalError(t *testing.T) {
 }
 
 func TestServer_HandleCreateData_InternalError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID := uuid.New()
 	token, _ := jwtManager.GenerateToken(userID, "testuser")
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	reqBody := models.DataRequest{
 		Type: models.DataTypeText,
@@ -1017,15 +1017,15 @@ func TestServer_HandleCreateData_InternalError(t *testing.T) {
 }
 
 func TestServer_HandleDeleteData_InternalError(t *testing.T) {
-	storage := storage.NewMemoryStorage()
+	userStorage := storage.NewMemoryStorage()
+	dataStorage := storage.NewMemoryStorage()
 	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-	server := NewServer(storage, jwtManager)
 
 	userID := uuid.New()
 	token, _ := jwtManager.GenerateToken(userID, "testuser")
 
 	router := mux.NewRouter()
-	server.RegisterRoutes(router)
+	RegisterRoutes(router, userStorage, dataStorage, jwtManager)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/data/550e8400-e29b-41d4-a716-446655440000", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -1035,260 +1035,5 @@ func TestServer_HandleDeleteData_InternalError(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Expected status %d, got %d", http.StatusNotFound, w.Code)
-	}
-}
-
-func TestServer_handleRegister(t *testing.T) {
-	tests := []struct {
-		name           string
-		req            models.UserRequest
-		expectedStatus int
-		wantErr        bool
-	}{
-		{
-			name: "valid registration",
-			req: models.UserRequest{
-				Username:       "testuser",
-				Password:       "password123",
-				MasterPassword: "masterPassword123!",
-			},
-			expectedStatus: http.StatusOK,
-			wantErr:        false,
-		},
-		{
-			name: "empty username",
-			req: models.UserRequest{
-				Username:       "",
-				Password:       "password123",
-				MasterPassword: "masterPassword123!",
-			},
-			expectedStatus: http.StatusOK,
-			wantErr:        false,
-		},
-		{
-			name: "empty password",
-			req: models.UserRequest{
-				Username:       "testuser",
-				Password:       "",
-				MasterPassword: "masterPassword123!",
-			},
-			expectedStatus: http.StatusOK,
-			wantErr:        false,
-		},
-		{
-			name: "invalid JSON",
-			req: models.UserRequest{
-				Username:       "testuser",
-				Password:       "password123",
-				MasterPassword: "masterPassword123!",
-			},
-			expectedStatus: http.StatusBadRequest,
-			wantErr:        true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockStorage := storage.NewMemoryStorage()
-			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(mockStorage, jwtManager)
-
-			router := mux.NewRouter()
-			server.RegisterRoutes(router)
-
-			var reqBody []byte
-			var err error
-
-			if tt.name == "invalid JSON" {
-				reqBody = []byte("invalid json")
-			} else {
-				reqBody, err = json.Marshal(tt.req)
-				if err != nil {
-					t.Fatalf("Failed to marshal request: %v", err)
-				}
-			}
-
-			req := httptest.NewRequest("POST", "/api/v1/register", bytes.NewBuffer(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			if w.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
-			}
-		})
-	}
-}
-
-func TestServer_handleLogin(t *testing.T) {
-	tests := []struct {
-		name           string
-		req            models.LoginRequest
-		expectedStatus int
-		wantErr        bool
-		setupUser      bool
-	}{
-		{
-			name: "valid login",
-			req: models.LoginRequest{
-				Username: "testuser",
-				Password: "password123",
-			},
-			expectedStatus: http.StatusOK,
-			wantErr:        false,
-			setupUser:      true,
-		},
-		{
-			name: "user not found",
-			req: models.LoginRequest{
-				Username: "nonexistent",
-				Password: "password123",
-			},
-			expectedStatus: http.StatusUnauthorized,
-			wantErr:        true,
-			setupUser:      false,
-		},
-		{
-			name: "invalid password",
-			req: models.LoginRequest{
-				Username: "testuser",
-				Password: "wrongpassword",
-			},
-			expectedStatus: http.StatusUnauthorized,
-			wantErr:        true,
-			setupUser:      true,
-		},
-		{
-			name: "invalid JSON",
-			req: models.LoginRequest{
-				Username: "testuser",
-				Password: "password123",
-			},
-			expectedStatus: http.StatusBadRequest,
-			wantErr:        true,
-			setupUser:      false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockStorage := storage.NewMemoryStorage()
-			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(mockStorage, jwtManager)
-
-			if tt.setupUser {
-				hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-				user := &models.User{
-					ID:        uuid.New(),
-					Username:  "testuser",
-					Password:  string(hashedPassword),
-					CreatedAt: time.Now(),
-					UpdatedAt: time.Now(),
-				}
-				if err := mockStorage.CreateUser(context.Background(), user); err != nil {
-					t.Fatalf("Failed to create user: %v", err)
-				}
-			}
-
-			router := mux.NewRouter()
-			server.RegisterRoutes(router)
-
-			var reqBody []byte
-			var err error
-
-			if tt.name == "invalid JSON" {
-				reqBody = []byte("invalid json")
-			} else {
-				reqBody, err = json.Marshal(tt.req)
-				if err != nil {
-					t.Fatalf("Failed to marshal request: %v", err)
-				}
-			}
-
-			req := httptest.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			if w.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
-			}
-		})
-	}
-}
-
-func TestServer_handleGetData(t *testing.T) {
-	tests := []struct {
-		name           string
-		token          string
-		expectedStatus int
-		wantErr        bool
-		setupUser      bool
-	}{
-		{
-			name:           "valid token",
-			token:          "",
-			expectedStatus: http.StatusOK,
-			wantErr:        false,
-			setupUser:      true,
-		},
-		{
-			name:           "invalid token",
-			token:          "invalid-token",
-			expectedStatus: http.StatusUnauthorized,
-			wantErr:        true,
-			setupUser:      false,
-		},
-		{
-			name:           "empty token",
-			token:          "",
-			expectedStatus: http.StatusUnauthorized,
-			wantErr:        true,
-			setupUser:      false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockStorage := storage.NewMemoryStorage()
-			jwtManager := auth.NewJWTManager("test-secret", time.Hour)
-			server := NewServer(mockStorage, jwtManager)
-
-			var token string
-			if tt.setupUser {
-				hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-				user := &models.User{
-					ID:        uuid.New(),
-					Username:  "testuser",
-					Password:  string(hashedPassword),
-					CreatedAt: time.Now(),
-					UpdatedAt: time.Now(),
-				}
-				if err := mockStorage.CreateUser(context.Background(), user); err != nil {
-					t.Fatalf("Failed to create user: %v", err)
-				}
-
-				token, _ = jwtManager.GenerateToken(user.ID, user.Username)
-			}
-
-			router := mux.NewRouter()
-			server.RegisterRoutes(router)
-
-			req := httptest.NewRequest("GET", "/api/v1/data", nil)
-			if tt.setupUser {
-				req.Header.Set("Authorization", "Bearer "+token)
-			} else if tt.token != "" {
-				req.Header.Set("Authorization", "Bearer "+tt.token)
-			}
-
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			if w.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
-			}
-		})
 	}
 }
