@@ -53,7 +53,7 @@ jobs:
     
     - name: Run migrations up
       env:
-        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper_test?sslmode=disable
+        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable
       run: |
         echo "Running migrations up..."
         migrate -path migrations -database "$DSN" up
@@ -62,7 +62,7 @@ jobs:
     
     - name: Test migration rollback
       env:
-        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper_test?sslmode=disable
+        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable
       run: |
         echo "Testing rollback..."
         migrate -path migrations -database "$DSN" down 1
@@ -75,7 +75,7 @@ jobs:
     
     - name: Verify database schema
       env:
-        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper_test?sslmode=disable
+        DSN: postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable
       run: |
         echo "Checking database tables:"
-        PGPASSWORD=postgres psql -h localhost -U postgres -d gophkeeper_test -c "\dt"
+        PGPASSWORD=postgres psql -h localhost -U postgres -d gophkeeper -c "\dt"
