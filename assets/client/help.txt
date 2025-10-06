@@ -1,0 +1,31 @@
+Available commands:
+  register <username> <password>  - Register a new user (requires master password)
+  login <username> <password>     - Login with existing user (requires master password)
+  list                            - List all encrypted data
+  get <id>                        - Get and decrypt data by ID
+  create <type> <name> [desc]     - Create new encrypted data
+  update <id>                     - Update existing encrypted data
+  delete <id>                     - Delete encrypted data
+  save <id> [path]                - Save decrypted binary data to file
+  help                            - Show this help
+  exit, quit                      - Exit the program
+
+Data types (all encrypted):
+  login_password - Login/password pairs with URL and notes
+  text          - Arbitrary text data with notes
+  binary        - Binary files (PDF, images, documents, etc.)
+  bank_card     - Bank card data (number, expiry, CVV, holder)
+
+Security features:
+  🔐 End-to-end encryption with AES-256-GCM
+  🔑 Master password required for all data operations
+  🛡️  Data encrypted on client before sending to server
+  🔒 Server never sees unencrypted data
+
+Examples:
+  create text "Shopping List" "My grocery list"
+  create login_password "Gmail Account" "My Gmail login"
+  create binary "Important Document.pdf" "Contract document"
+  create bank_card "Visa Card" "My primary credit card"
+  get 123e4567-e89b-12d3-a456-426614174000
+  save 123e4567-e89b-12d3-a456-426614174000 ./downloaded_file.pdf
